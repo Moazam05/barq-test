@@ -13,21 +13,22 @@ import {
   Pagination,
   TextField,
   InputAdornment,
+  Avatar,
+  Chip,
 } from "@mui/material";
 import { sampleOrders } from "./constants/data";
+import useCompanySubdomain from "./hooks/useCompanySubdomain";
+import { getCompanyLogo } from "./services/logoService";
 
 const App = () => {
-  // Get subdomain to determine which company's orders to show
-  const getSubdomain = () => {
-    const hostname = window.location.hostname;
-    const parts = hostname.split(".");
-    return parts.length > 2 ? parts[0] : "daraz"; // Default to daraz if no subdomain
-  };
+  // Use custom hook to handle company detection from subdomain
+  const { company, switchCompany, isLoading } =
+    useCompanySubdomain(sampleOrders);
 
-  const [company, setCompany] = useState(getSubdomain());
   const [page, setPage] = useState(1);
   const [ordersPerPage, setOrdersPerPage] = useState(10);
   const [orders, setOrders] = useState([]);
+  const [logo, setLogo] = useState("");
 
   // For URL params sync (optional task)
   useEffect(() => {
@@ -44,26 +45,35 @@ const App = () => {
     const params = new URLSearchParams(window.location.search);
     params.set("perPage", ordersPerPage.toString());
 
+    // Don't override the company param that might be set by the useCompanySubdomain hook
+    if (!params.has("company")) {
+      params.set("company", company);
+    }
+
     // Update URL without refreshing the page
     window.history.replaceState(
       {},
       "",
       `${window.location.pathname}?${params.toString()}`
     );
-  }, [ordersPerPage]);
+  }, [ordersPerPage, company]);
 
   useEffect(() => {
-    // For development/testing purposes - allow switching companies
-    // In real app, this would be determined by subdomain only
+    if (isLoading) return;
+
+    // Set company logo
+    setLogo(getCompanyLogo(company));
+
+    // Set orders data
     if (sampleOrders[company]) {
       setOrders(sampleOrders[company]);
     } else {
-      // Default to first company if invalid company name
+      // Default to first company if invalid
       const firstCompany = Object.keys(sampleOrders)[0];
-      setCompany(firstCompany);
+      switchCompany(firstCompany);
       setOrders(sampleOrders[firstCompany]);
     }
-  }, [company]);
+  }, [company, isLoading, switchCompany]);
 
   // Get current orders for pagination
   const indexOfLastOrder = page * ordersPerPage;
@@ -85,6 +95,17 @@ const App = () => {
     }
   };
 
+  // Format company name for display
+  const displayCompanyName = company.charAt(0).toUpperCase() + company.slice(1);
+
+  if (isLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, textAlign: "center" }}>
+        <Typography variant="h5">Loading...</Typography>
+      </Container>
+    );
+  }
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box
@@ -95,12 +116,44 @@ const App = () => {
           alignItems: "center",
         }}
       >
+        {/* Company Logo */}
+        <Box sx={{ mb: 2 }}>
+          <Avatar
+            src={logo}
+            alt={`${displayCompanyName} logo`}
+            sx={{ width: 80, height: 80 }}
+            variant="rounded"
+          />
+        </Box>
+
         <Typography variant="h3" component="h1" gutterBottom>
-          {company.charAt(0).toUpperCase() + company.slice(1)} Orders
+          {displayCompanyName} Orders
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
           OrderMade Management Platform
         </Typography>
+
+        {/* Company selector for development purposes */}
+        <Box
+          sx={{
+            mt: 2,
+            display: "flex",
+            gap: 1,
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          {Object.keys(sampleOrders).map((comp) => (
+            <Chip
+              key={comp}
+              label={comp}
+              onClick={() => switchCompany(comp)}
+              color={company === comp ? "primary" : "default"}
+              variant={company === comp ? "filled" : "outlined"}
+              sx={{ m: 0.5 }}
+            />
+          ))}
+        </Box>
       </Box>
 
       <Box sx={{ mb: 3, display: "flex", justifyContent: "flex-end" }}>
@@ -123,6 +176,7 @@ const App = () => {
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: "primary.light" }}>
+              <TableCell>Index</TableCell>
               <TableCell>Order ID</TableCell>
               <TableCell>Customer Name</TableCell>
               <TableCell>Amount</TableCell>
@@ -130,13 +184,14 @@ const App = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {currentOrders.map((order) => (
+            {currentOrders.map((order, index) => (
               <TableRow
                 key={order.orderId}
                 sx={{
                   "&:nth-of-type(odd)": { backgroundColor: "action.hover" },
                 }}
               >
+                <TableCell>{indexOfFirstOrder + index + 1}</TableCell>
                 <TableCell component="th" scope="row">
                   {order.orderId}
                 </TableCell>
