@@ -146,7 +146,7 @@ const App = () => {
           {Object.keys(sampleOrders).map((comp) => (
             <Chip
               key={comp}
-              label={comp}
+              label={`${comp} (${sampleOrders[comp].length})`}
               onClick={() => switchCompany(comp)}
               color={company === comp ? "primary" : "default"}
               variant={company === comp ? "filled" : "outlined"}
